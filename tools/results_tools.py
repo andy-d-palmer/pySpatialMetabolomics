@@ -34,3 +34,11 @@ def load_results(filename_in):
                     iso_correlation_score,
                     iso_ratio_score,
                     moc_pass)
+def check_pass(pass_thresh,pass_val):
+    tf = []
+    for v,t in zip(pass_val,pass_thresh):
+        tf.append(v>t)
+    if all(tf):
+        return True
+    else:
+        return False
