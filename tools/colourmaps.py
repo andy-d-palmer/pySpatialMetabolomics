@@ -36,12 +36,12 @@ def make_cmap(colors,name='custom', position=None, bit=False):
     cm.register_cmap(name='custom', cmap=cmap)
     return cmap
 
-c_map = make_cmap([(53,42,135)
-,(2,104,225)
-,(16,142,210)
-,(15,174,185)
-,(101,190,134)
-,(192,188,96)
-,(255,195,55)
-,(249,251,14)],bit=True,name='parula')
+#c_map = make_cmap([(53,42,135)
+#,(2,104,225)
+#,(16,142,210)
+#,(15,174,185)
+#,(101,190,134)
+#,(192,188,96)
+#,(255,195,55)
+#,(249,251,14)],bit=True,name='parula')
 
