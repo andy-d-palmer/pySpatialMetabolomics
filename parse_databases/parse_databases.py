@@ -66,6 +66,63 @@ def read_hmdb_compounds(filename):
                     sum_formulae[sf]['db_id'] = [db_id]
                     sum_formulae[sf]['mw'] = mw
     return sum_formulae
+def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
+    import csv
+    sum_formulae = {}
+    with open(filename,'rU') as filein_db:
+        data_in = csv.reader(filein_db,delimiter=',')
+        # skip the headers
+        for n in range(0,header):
+            next(data_in, None)
+        
+        for line in data_in:
+            if line == []: #catch empty line(s)
+                continue
+            db_id = line[idcol]
+            sf = line[sfcol]
+            name = line[namecol]
+            mw = line[mwcol]
+            if mw=='':
+                mw = '0'
+            if '+' in sf or '-' in sf:
+                print 'bailing on charged molecule {} '.format(sf)
+                name=''
+                sf=''
+                mw=''
+                db_id=''
+                continue
+            sum_formulae[sf] = {}
+            sum_formulae[sf]['name'] = [name]
+            sum_formulae[sf]['db_id'] = [db_id]
+            sum_formulae[sf]['mw'] = mw
+    return sum_formulae
+def read_helfrich_cyano_compounds(filename):
+    import csv
+    sum_formulae = {}
+    with open(filename,'rU') as filein_db:
+        data_in = csv.reader(filein_db,delimiter=',')
+
+        for line in data_in:
+            if line == []: #catch empty line(s)
+                continue
+            db_id,sf,name = line[0:3]
+            if sf=='Formula': #skip header line
+                continue
+            mw=''
+            if mw=='':
+                mw = '0'
+            if '+' in sf or '-' in sf:
+                print 'bailing on charged molecule {} '.format(sf)
+                name=''
+                sf=''
+                mw=''
+                db_id=''
+                continue
+            sum_formulae[sf] = {}
+            sum_formulae[sf]['name'] = [name]
+            sum_formulae[sf]['db_id'] = [db_id]
+            sum_formulae[sf]['mw'] = mw
+    return sum_formulae
 
 def read_pubchem_properties(filename):
     # download from pubchem - delete first blank line, add one blank line to end
