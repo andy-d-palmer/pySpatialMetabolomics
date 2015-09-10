@@ -91,6 +91,9 @@ def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
                 mw=''
                 db_id=''
                 continue
+            if sf =='':
+                print 'bailing on empty sf: {} {} {}'.format(db_id,name,mw)
+                continue
             sum_formulae[sf] = {}
             sum_formulae[sf]['name'] = [name]
             sum_formulae[sf]['db_id'] = [db_id]
