@@ -19,13 +19,16 @@ def generate_isotope_patterns(config):
     from pyMS.pyisocalc import pyisocalc
     import pickle
     ### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
-    def calcualte_isotope_patterns(sum_formulae, adducts='', isocalc_sig=0.01, isocalc_resolution=200000.,
+    def calcualte_isotope_patterns(sum_formulae, adduct='', isocalc_sig=0.01, isocalc_resolution=200000.,
                                    isocalc_do_centroid=True, charge='1'):
         ### Generate a mz list of peak centroids for each sum formula with the given adduct
-        # todo - parse sum formula and adduct properly so that subtractions (losses) can be utilised (this code already exists somewhere)
         mz_list = {}
         for n, sum_formula in enumerate(sum_formulae):
-            isotope_ms = pyisocalc.isodist(sum_formula + adduct, plot=False, sigma=isocalc_sig, charges=charge,
+            sf = pyisocalc.complex_to_simple(sum_formula+adduct)
+            if sf == None: #negative atoms as a result of simplification
+                print 'negative adduct for {} : {}'.format(sum_formula,adduct)
+                continue
+            isotope_ms = pyisocalc.isodist(sf, plot=False, sigma=isocalc_sig, charges=charge,
                                            resolution=isocalc_resolution, do_centroid=isocalc_do_centroid)
             if not sum_formula in mz_list:
                 mz_list[sum_formula] = {}
@@ -59,15 +62,17 @@ def generate_isotope_patterns(config):
             mz_list_tmp = pickle.load(open(load_file, 'r'))
         else:
             print "{} -> generating".format(load_file)
-            mz_list_tmp = calcualte_isotope_patterns(sum_formulae, adducts=(adduct,), isocalc_sig=isocalc_sig,
+            mz_list_tmp = calcualte_isotope_patterns(sum_formulae, adduct=adduct, isocalc_sig=isocalc_sig,
                                                      isocalc_resolution=isocalc_resolution, charge=charge)
             if db_dump_folder != "":
                 pickle.dump(mz_list_tmp, open(load_file, 'w'))
         # add patterns to total list
         for sum_formula in sum_formulae:
-            if not sum_formula in mz_list:
-                mz_list[sum_formula] = {}
-            # this limit of 4 is hardcoded to reduce the number of calculations
+            if sum_formula not in mz_list_tmp:# could be missing if [M-a] would have negative atoms
+                continue
+            if sum_formula not in mz_list:
+                mz_list[sum_formula]={}
+            ## this limit of 4 is hardcoded to reduce the number of calculations
             n = np.min([4,len(mz_list_tmp[sum_formula][adduct][0])])
             mz_list[sum_formula][adduct] = [mz_list_tmp[sum_formula][adduct][0][0:n],mz_list_tmp[sum_formula][adduct][1][0:n]]
     print 'all isotope patterns generated and loaded'
@@ -97,35 +102,35 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
     for adduct in adducts:
         print 'searching -> {}'.format(adduct)
         for ii,sum_formula in enumerate(sum_formulae):
+            if adduct not in mz_list[sum_formula]:#adduct may not be present if it would make an impossible formula, is there a better way to handle this?
+                continue
             if time.time() - t_el > 10:
                 t_el = time.time()
                 print '{:3.2f} done in {:3.0f} seconds'.format(float(ii)/len(sum_formulae),time.time()-t0)
+            # Allocate dicts if required
+            if not sum_formula in measure_value_score:
+                    measure_value_score[sum_formula] = {}
+            if not sum_formula in iso_correlation_score:
+                    iso_correlation_score[sum_formula] = {}
+            if not sum_formula in iso_ratio_score:
+                    iso_ratio_score[sum_formula] = {}
             try:
-                # 1. Geneate ion images
+                # 1. Generate ion images
                 ion_datacube = IMS_dataset.get_ion_image(mz_list[sum_formula][adduct][0],
                                                          ppm)  # for each spectrum, sum the intensity of all peaks within tol of mz_list
                 ion_datacube.xic = hot_spot_removal(ion_datacube.xic, q)
-
                 # 2. Spatial Chaos
-                if not sum_formula in measure_value_score:
-                    measure_value_score[sum_formula] = {}
                 measure_value_score[sum_formula][adduct] = 1 - level_sets_measure.measure_of_chaos(
                     ion_datacube.xic_to_image(0), nlevels, interp=False)[0]
                 if measure_value_score[sum_formula][adduct] == 1:
                     measure_value_score[sum_formula][adduct] = 0
-
                 # 3. Score correlation with monoiso
-                if not sum_formula in iso_correlation_score:
-                    iso_correlation_score[sum_formula] = {}
                 if len(mz_list[sum_formula][adduct][1]) > 1:
                     iso_correlation_score[sum_formula][adduct] = isotope_image_correlation.isotope_image_correlation(
                         ion_datacube.xic, weights=mz_list[sum_formula][adduct][1][1:])
                 else:  # only one isotope peak, so correlation doesn't make sense
                     iso_correlation_score[sum_formula][adduct] = 1
-
                 # 4. Score isotope ratio
-                if not sum_formula in iso_ratio_score:
-                    iso_ratio_score[sum_formula] = {}
                 iso_ratio_score[sum_formula][adduct] = isotope_pattern_match.isotope_pattern_match(ion_datacube.xic,
                                                                                                    mz_list[sum_formula][
                                                                                                        adduct][1])
@@ -178,17 +183,24 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
         f_out.write('sf,adduct,mz,moc,spec,spat,pass\n'.format())
         for sum_formula in sum_formulae:
             for adduct in adducts:
-                moc_pass = check_pass((measure_tol, iso_corr_tol, iso_ratio_tol), (
-                    measure_value_score[sum_formula][adduct], iso_correlation_score[sum_formula][adduct],
-                    iso_ratio_score[sum_formula][adduct]))
-                f_out.write('{},{},{},{},{},{},{}\n'.format(
+                if adduct not in mz_list[sum_formula]:
+                    continue
+                p_vals = (
+                    measure_value_score[sum_formula][adduct],
+                    iso_correlation_score[sum_formula][adduct],
+                    iso_ratio_score[sum_formula][adduct])
+                moc_pass = check_pass((measure_tol, iso_corr_tol, iso_ratio_tol), p_vals)
+                str_out = '{},{},{},{},{},{},{}\n'.format(
                     sum_formula,
                     adduct,
                     mz_list[sum_formula][adduct][0][0],
                     measure_value_score[sum_formula][adduct],
                     iso_correlation_score[sum_formula][adduct],
                     iso_ratio_score[sum_formula][adduct],
-                    moc_pass))
+                    moc_pass)
+                str_out.replace('[',"\"")
+                str_out.replace(']',"\"")
+                f_out.write(str_out)
 
     filename_out = '{}{}{}_{}_pass_results.txt'.format(output_dir, os.sep,
                                                     os.path.splitext(os.path.basename(filename_in))[0],fname)
@@ -196,6 +208,8 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
         f_out.write('ID,sf,adduct,mz,moc,spec,spat\n'.format())
         for sum_formula in sum_formulae:
             for adduct in adducts:
+                if adduct not in mz_list[sum_formula]:
+                    continue
                 if check_pass((measure_tol, iso_corr_tol, iso_ratio_tol), (
                         measure_value_score[sum_formula][adduct], iso_correlation_score[sum_formula][adduct],
                         iso_ratio_score[sum_formula][adduct])):
@@ -224,3 +238,4 @@ def run_pipeline(JSON_config_file):
                                                                              mz_list)
     # pass_list = score_results(config,measure_value_score, iso_correlation_score, iso_ratio_score)
     output_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, adducts, mz_list,fname='all_adducts')
+
