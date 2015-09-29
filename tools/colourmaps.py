@@ -33,7 +33,7 @@ def make_cmap(colors,name='custom', position=None, bit=False):
         cdict['blue'].append((pos, color[2], color[2]))
 
     cmap = mpl.colors.LinearSegmentedColormap('custom',cdict,256)
-    cm.register_cmap(name='custom', cmap=cmap)
+    cm.register_cmap(name=name, cmap=cmap)
     return cmap
 
 
