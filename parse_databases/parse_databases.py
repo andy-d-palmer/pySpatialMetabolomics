@@ -94,9 +94,10 @@ def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
             if sf =='':
                 print 'bailing on empty sf: {} {} {}'.format(db_id,name,mw)
                 continue
-            sum_formulae[sf] = {}
-            sum_formulae[sf]['name'] = [name]
-            sum_formulae[sf]['db_id'] = [db_id]
+            if not sf in sum_formulae:
+                sum_formulae[sf] = {'name':[], 'db_id':[], 'mw':[]}
+            sum_formulae[sf]['name'].append(name)
+            sum_formulae[sf]['db_id'].append(db_id)
             sum_formulae[sf]['mw'] = mw
     return sum_formulae
 def read_helfrich_cyano_compounds(filename):
@@ -121,9 +122,10 @@ def read_helfrich_cyano_compounds(filename):
                 mw=''
                 db_id=''
                 continue
-            sum_formulae[sf] = {}
-            sum_formulae[sf]['name'] = [name]
-            sum_formulae[sf]['db_id'] = [db_id]
+            if not sf in sum_formulae:
+                sum_formulae[sf] = {'name':[], 'db_id':[], 'mw':[]}
+            sum_formulae[sf]['name'].append(name)
+            sum_formulae[sf]['db_id'] = db_id
             sum_formulae[sf]['mw'] = mw
     return sum_formulae
 
