@@ -1,10 +1,6 @@
 import numpy as np
-# import matplotlib.pyplot as plt
-# import matplotlib.image as mpimg
-import csv
 import sys
 import os
-
 sys.path.append('/Users/palmer/Documents/python_codebase/')
 
 
@@ -139,6 +135,7 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
         output_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, [adduct], mz_list)
     return measure_value_score, iso_correlation_score, iso_ratio_score
 
+
 def check_pass(pass_thresh, pass_val):
     tf = []
     for v, t in zip(pass_val, pass_thresh):
@@ -147,6 +144,8 @@ def check_pass(pass_thresh, pass_val):
         return True
     else:
         return False
+
+
 def score_results(config, measure_value_score, iso_correlation_score, iso_ratio_score):
     measure_tol = config['results_thresholds']['measure_tol']
     iso_corr_tol = config['results_thresholds']['iso_corr_tol']
@@ -180,7 +179,7 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
     filename_out = '{}{}{}_{}_full_results.txt'.format(output_dir, os.sep,
                                                     os.path.splitext(os.path.basename(filename_in))[0],fname)
     with open(filename_out, 'w') as f_out:
-        f_out.write('sf,adduct,mz,moc,spec,spat,pass\n'.format())
+        f_out.write('sf,adduct,mz,moc,spat,spec,pass\n'.format())
         for sum_formula in sum_formulae:
             for adduct in adducts:
                 if adduct not in mz_list[sum_formula]:
@@ -202,6 +201,79 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
                 str_out.replace(']',"\"")
                 f_out.write(str_out)
 
+
+def output_results_exactMass(config, ppm_value_score, sum_formulae, adducts, mz_list, fname=''):
+    import os
+    filename_in = config['file_inputs']['data_file']
+    output_dir = config['file_inputs']['results_folder']
+    # sum_formulae,adducts,mz_list = generate_isotope_patterns(config)
+    # Save the processing results
+    if os.path.isdir(output_dir) == False:
+        os.mkdir(output_dir)
+    if fname == '':
+        for adduct in adducts:
+            fname='{}_{}'.format(fname,adduct)
+
+    filename_out = '{}{}{}_{}_exactMass_full_results.txt'.format(output_dir, os.sep,
+                                                    os.path.splitext(os.path.basename(filename_in))[0],fname)
+    with open(filename_out, 'w') as f_out:
+        f_out.write('sf,adduct,mz,ppm\n'.format())
+        for sum_formula in sum_formulae:
+            for adduct in adducts:
+                if adduct not in mz_list[sum_formula]:
+                    continue
+                str_out = '{},{},{},{}\n'.format(
+                    sum_formula,
+                    adduct,
+                    mz_list[sum_formula][adduct][0][0],
+                    ppm_value_score[sum_formula][adduct])
+                str_out.replace('[',"\"")
+                str_out.replace(']',"\"")
+                f_out.write(str_out)
+
+def output_results_frequencyFilter(config, ppm_value_score, sum_formulae, adducts, mz_list, fname=''):
+    import os
+    filename_in = config['file_inputs']['data_file']
+    output_dir = config['file_inputs']['results_folder']
+    # sum_formulae,adducts,mz_list = generate_isotope_patterns(config)
+    # Save the processing results
+    if os.path.isdir(output_dir) == False:
+        os.mkdir(output_dir)
+    if fname == '':
+        for adduct in adducts:
+            fname='{}_{}'.format(fname,adduct)
+
+    filename_out = '{}{}{}_{}_frequencyFilter_full_results.txt'.format(output_dir, os.sep,
+                                                    os.path.splitext(os.path.basename(filename_in))[0],fname)
+    with open(filename_out, 'w') as f_out:
+        f_out.write('sf,adduct,mz,fraction\n'.format())
+        for sum_formula in sum_formulae:
+            for adduct in adducts:
+                if adduct not in mz_list[sum_formula]:
+                    continue
+                str_out = '{},{},{},{}\n'.format(
+                    sum_formula,
+                    adduct,
+                    mz_list[sum_formula][adduct][0][0],
+                    ppm_value_score[sum_formula][adduct])
+                str_out.replace('[',"\"")
+                str_out.replace(']',"\"")
+                f_out.write(str_out)
+
+def output_pass_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, adducts, mz_list, fname=''):
+    import os
+    filename_in = config['file_inputs']['data_file']
+    output_dir = config['file_inputs']['results_folder']
+    measure_tol = config['results_thresholds']['measure_tol']
+    iso_corr_tol = config['results_thresholds']['iso_corr_tol']
+    iso_ratio_tol = config['results_thresholds']['iso_ratio_tol']
+    # sum_formulae,adducts,mz_list = generate_isotope_patterns(config)
+    # Save the processing results
+    if os.path.isdir(output_dir) == False:
+        os.mkdir(output_dir)
+    if fname == '':
+        for adduct in adducts:
+            fname='{}_{}'.format(fname,adduct)
     filename_out = '{}{}{}_{}_pass_results.txt'.format(output_dir, os.sep,
                                                     os.path.splitext(os.path.basename(filename_in))[0],fname)
     with open(filename_out, 'w') as f_out:
@@ -224,18 +296,93 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
 
 def load_data(config):
     # Parse dataset
-    from pyIMS.hdf5.inMemoryIMS_hdf5 import inMemoryIMS_hdf5
-    IMS_dataset = inMemoryIMS_hdf5(config['file_inputs']['data_file'])
+    from pyIMS.hdf5.inMemoryIMS import inMemoryIMS
+    IMS_dataset = inMemoryIMS(config['file_inputs']['data_file'])
     return IMS_dataset
+
+
+def takeClosest(myList, myNumber):
+        import bisect
+        """
+        Assumes myList is sorted. Returns closest value to myNumber.
+        If two numbers are equally close, return the smallest number.
+        """
+        pos = bisect.bisect_left(myList, myNumber)
+        if pos == 0:
+            return (myList[0],pos)
+        if pos == len(myList):
+            return (myList[-1],pos)
+        before = abs(myList[pos - 1]-myNumber)
+        after = abs(myList[pos]-myNumber)
+        if after <  before:
+           return (after,pos)
+        else:
+           return (before,pos-1)
+
+
+def run_exact_mass_search(config, mzs,counts, sum_formulae, adducts, mz_list):
+    from pyMS.centroid_detection import gradient
+    ### Runs the main pipeline
+    # Get sum formula and predicted m/z peaks for molecules in database
+    ppm_value_score = {}
+    for sum_formula in sum_formulae:
+        ppm_value_score[sum_formula]={}
+    for adduct in adducts:
+        for ii,sum_formula in enumerate(sorted(sum_formulae.keys())):
+            if adduct not in mz_list[sum_formula]:#adduct may not be present if it would make an impossible formula, is there a better way to handle this?
+                continue
+            target_mz = mz_list[sum_formula][adduct][0][0]
+            mz_nearest,pos = takeClosest(mzs, target_mz)
+            ppm_value_score[sum_formula][adduct] = 1e6*mz_nearest/target_mz
+        output_results_exactMass(config, ppm_value_score, sum_formulae, [adduct], mz_list)
+    return ppm_value_score
+
+
+def run_frequency_mass_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
+    ### Runs the main pipeline
+    # Get sum formula and predicted m/z peaks for molecules in database
+    freq_value_score = {}
+    for sum_formula in sum_formulae:
+        freq_value_score[sum_formula]={}
+    for adduct in adducts:
+        for ii,sum_formula in enumerate(sorted(sum_formulae.keys())):
+            if adduct not in mz_list[sum_formula]:#adduct may not be present if it would make an impossible formula, is there a better way to handle this?
+                continue
+            target_mz = mz_list[sum_formula][adduct][0][0]
+            ion_image = IMS_dataset.get_ion_image(np.asarray([target_mz,]),np.asarray([config['image_generation']['ppm'],]))
+            freq_value_score[sum_formula][adduct] = np.sum(np.asarray(ion_image.xic)>0)/float(len(ion_image.xic[0]))
+        output_results_exactMass(config, freq_value_score, sum_formulae, [adduct], mz_list)
+    return freq_value_score
 
 
 def run_pipeline(JSON_config_file):
     config = get_variables(JSON_config_file)
     sum_formulae, adducts, mz_list = generate_isotope_patterns(config)
     IMS_dataset = load_data(config)
-
-    measure_value_score, iso_correlation_score, iso_ratio_score = run_search(config, IMS_dataset, sum_formulae, adducts,
-                                                                             mz_list)
+    measure_value_score, iso_correlation_score, iso_ratio_score = run_search(config, IMS_dataset, sum_formulae, adducts,mz_list)
     # pass_list = score_results(config,measure_value_score, iso_correlation_score, iso_ratio_score)
-    output_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, adducts, mz_list,fname='all_adducts')
+    output_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, adducts, mz_list,fname='spatial_all_adducts')
 
+
+def exact_mass(JSON_config_file):
+    config = get_variables(JSON_config_file)
+    sum_formulae, adducts, mz_list = generate_isotope_patterns(config)
+    IMS_dataset = load_data(config)
+    spec_axis,mean_spec =IMS_dataset.generate_summary_spectrum(summary_type='mean',ppm=config['image_generation']['ppm']/2)
+    from pyMS.centroid_detection import gradient
+    import numpy as np
+    mzs,counts,idx_list = gradient(np.asarray(spec_axis),np.asarray(mean_spec),weighted_bins=2)
+    ppm_value_score = run_exact_mass_search(config,  mzs,counts, sum_formulae, adducts, mz_list)
+    output_results_exactMass(config, ppm_value_score, sum_formulae, adducts, mz_list,fname='exactMass_all_adducts')
+
+
+def frequency_filter(JSON_config_file):
+    config = get_variables(JSON_config_file)
+    sum_formulae, adducts, mz_list = generate_isotope_patterns(config)
+    IMS_dataset = load_data(config)
+    #spec_axis,mean_spec =IMS_dataset.generate_summary_spectrum(summary_type='hist',ppm=config['image_generation']['ppm']/2)
+    #from pyMS.centroid_detection import gradient
+    #import numpy as np
+    #mzs,counts,idx_list = gradient(np.asarray(spec_axis),np.asarray(mean_spec),weighted_bins=2)
+    ppm_value_score = run_frequency_mass_search(config,  IMS_dataset, sum_formulae, adducts, mz_list)
+    output_results_frequencyFilter(config, ppm_value_score, sum_formulae, adducts, mz_list,fname='frequencyFilter_all_adducts')
