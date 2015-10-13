@@ -35,6 +35,50 @@ def load_results(filename_in):
                     iso_ratio_score,
                     moc_pass)
 
+def condense_lipid(str_in):
+    """
+    test_str = 'PA(18:1(11Z)/18:1(11Z))' #36:2
+    test_str="PA(18:0/18:2(9Z12Z))" #36:2
+    test_str = "PC(15:0/18:0)" #32:0
+    test_str = PE(P-18:1(11Z)/22:5(7Z,10Z,13Z,16Z,19Z)) # PE(40:6) synonym from HMDB
+    test_str = "PE(22:5(7Z10Z13Z16Z19Z)/dm18:1(9Z))" # PE(40:6) synonym from HMDB
+    print condense_lipid(test_str)
+    test_str='PC(o-18:1(9Z)/16:0)' #PC(o-34:1)
+    print condense_lipid(test_str)
+    """
+    l_class = str_in[0:str_in.index("(")]
+    chain_info = [c.strip('()') for c in str_in[str_in.index("("):].split('/')]
+    n_carbon=0
+    n_dbl=0
+    prefix=""
+    for c in chain_info:
+        try:
+            c = c[:c.index('(')]
+        except ValueError as e:
+            if str(e) != "substring not found":
+                raise
+        c=c.split(':')
+        allowed_prefix_2 = ("P-","dm","o-","O-")
+        allowed_prefix_1 = ("d",)
+        for ii,c_ in enumerate(c):
+            if c_.startswith(allowed_prefix_2):
+                prefix=prefix+c_[0:2]
+                c[ii]=c_[2:]
+            elif c_.startswith(allowed_prefix_1):
+                prefix=prefix+c_[0]
+                c[ii]=c_[1:]
+        try:
+            n_carbon+=int(c[0])
+            n_dbl+=int(c[1])
+            l_string="{}({}{}:{})".format(l_class,prefix,n_carbon,n_dbl)
+        except ValueError as e:
+            if str(e).startswith('invalid literal for int() with base 10:'):
+                print 'consense failed for: {}'.format(str_in)
+                l_string = str_in
+            else:
+                raise
+    return l_string
+
 
 def check_pass(pass_thresh,pass_val):
     tf = []
