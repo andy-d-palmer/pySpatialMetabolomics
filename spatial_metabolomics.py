@@ -99,8 +99,9 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
         print 'searching -> {}'.format(adduct)
         for ii,sum_formula in enumerate(sum_formulae):
             if adduct not in mz_list[sum_formula]:#adduct may not be present if it would make an impossible formula, is there a better way to handle this?
+                print '{} adduct not found for {}'.format(adduct, mz_list[sum_formula])
                 continue
-            if time.time() - t_el > 10:
+            if time.time() - t_el > 10.:
                 t_el = time.time()
                 print '{:3.2f} done in {:3.0f} seconds'.format(float(ii)/len(sum_formulae),time.time()-t0)
             # Allocate dicts if required
