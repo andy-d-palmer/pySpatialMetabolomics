@@ -10,12 +10,8 @@ def get_variables(json_filename):
     return config
 
 
-def generate_isotope_patterns(config):
-    from pySpatialMetabolomics.parse_databases import parse_databases
-    from pyMS.pyisocalc import pyisocalc
-    import pickle
-    ### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
-    def calcualte_isotope_patterns(sum_formulae, adduct='', isocalc_sig=0.01, isocalc_resolution=200000.,
+### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
+def calculate_isotope_patterns(sum_formulae, adduct='', isocalc_sig=0.01, isocalc_resolution=200000.,
                                    isocalc_do_centroid=True, charge='1'):
         ### Generate a mz list of peak centroids for each sum formula with the given adduct
         mz_list = {}
@@ -31,6 +27,11 @@ def generate_isotope_patterns(config):
             mz_list[sum_formula][adduct] = isotope_ms.get_spectrum(source='centroids')
         return mz_list
 
+
+def generate_isotope_patterns(config):
+    from pySpatialMetabolomics.parse_databases import parse_databases
+    from pyMS.pyisocalc import pyisocalc
+    import pickle
     # Extract variables from config dict
     db_filename = config['file_inputs']['database_file']
     db_dump_folder = config['file_inputs']['database_load_folder']
@@ -58,7 +59,7 @@ def generate_isotope_patterns(config):
             mz_list_tmp = pickle.load(open(load_file, 'r'))
         else:
             print "{} -> generating".format(load_file)
-            mz_list_tmp = calcualte_isotope_patterns(sum_formulae, adduct=adduct, isocalc_sig=isocalc_sig,
+            mz_list_tmp = calculate_isotope_patterns(sum_formulae, adduct=adduct, isocalc_sig=isocalc_sig,
                                                      isocalc_resolution=isocalc_resolution, charge=charge)
             if db_dump_folder != "":
                 pickle.dump(mz_list_tmp, open(load_file, 'w'))
@@ -99,7 +100,7 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
         print 'searching -> {}'.format(adduct)
         for ii,sum_formula in enumerate(sum_formulae):
             if adduct not in mz_list[sum_formula]:#adduct may not be present if it would make an impossible formula, is there a better way to handle this?
-                print '{} adduct not found for {}'.format(adduct, mz_list[sum_formula])
+                # print '{} adduct not found for {}'.format(adduct, mz_list[sum_formula])
                 continue
             if time.time() - t_el > 10.:
                 t_el = time.time()
@@ -173,12 +174,7 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
     # Save the processing results
     if os.path.isdir(output_dir) == False:
         os.mkdir(output_dir)
-    if fname == '':
-        for adduct in adducts:
-            fname='{}_{}'.format(fname,adduct)
-
-    filename_out = '{}{}{}_{}_full_results.txt'.format(output_dir, os.sep,
-                                                    os.path.splitext(os.path.basename(filename_in))[0],fname)
+    filename_out = generate_output_filename(config,adducts,fname=fname)
     with open(filename_out, 'w') as f_out:
         f_out.write('sf,adduct,mz,moc,spat,spec,pass\n'.format())
         for sum_formula in sum_formulae:
@@ -202,6 +198,15 @@ def output_results(config, measure_value_score, iso_correlation_score, iso_ratio
                 str_out.replace(']',"\"")
                 f_out.write(str_out)
 
+def generate_output_filename(config,adducts,fname=''):
+    filename_in = config['file_inputs']['data_file']
+    output_dir = config['file_inputs']['results_folder']
+    if fname == '':
+        for adduct in adducts:
+            fname='{}_{}'.format(fname,adduct)
+    filename_out = '{}{}{}_{}_full_results.txt'.format(output_dir, os.sep,
+                                                    os.path.splitext(os.path.basename(filename_in))[0],fname)
+    return filename_out
 
 def output_results_exactMass(config, ppm_value_score, sum_formulae, adducts, mz_list, fname=''):
     import os
@@ -356,9 +361,25 @@ def run_frequency_mass_search(config, IMS_dataset, sum_formulae, adducts, mz_lis
     return freq_value_score
 
 
+def fdr_selection(mz_list,pl_adducts, n_im):
+    # produces a random subset of the adducts loaded in mz_list to actually calculate with
+    pl_adducts = set(pl_adducts)
+    for sf in mz_list:
+        adduct_list = set(mz_list[sf].keys()) - pl_adducts # can be different for each molecule (e.g if adduct loss would be imposisble)
+        rep=False
+        if len(adduct_list)<n_im:
+            rep=True
+        keep_adducts = set(np.random.choice(list(adduct_list),n_im,replace=rep))|pl_adducts
+        for a in adduct_list- keep_adducts:
+            del mz_list[sf][a]
+    return mz_list
+
+
 def run_pipeline(JSON_config_file):
     config = get_variables(JSON_config_file)
     sum_formulae, adducts, mz_list = generate_isotope_patterns(config)
+    if 'fdr' in config:
+        mz_list = fdr_selection(mz_list,[str(a["adduct"]) for a in config['fdr']["pl_adducts"]], config['fdr']['n_im'])
     IMS_dataset = load_data(config)
     measure_value_score, iso_correlation_score, iso_ratio_score = run_search(config, IMS_dataset, sum_formulae, adducts,mz_list)
     # pass_list = score_results(config,measure_value_score, iso_correlation_score, iso_ratio_score)
