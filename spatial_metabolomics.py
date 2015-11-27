@@ -328,7 +328,6 @@ def takeClosest(myList, myNumber):
 
 
 def run_exact_mass_search(config, mzs,counts, sum_formulae, adducts, mz_list):
-    from pyMS.centroid_detection import gradient
     ### Runs the main pipeline
     # Get sum formula and predicted m/z peaks for molecules in database
     ppm_value_score = {}
