@@ -13,24 +13,25 @@ def get_variables(json_filename):
 ### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
 def calculate_isotope_patterns(sum_formulae, adduct='', isocalc_sig=0.01, isocalc_resolution=200000.,
                                    isocalc_do_centroid=True, charge='1'):
-        ### Generate a mz list of peak centroids for each sum formula with the given adduct
-        mz_list = {}
-        for n, sum_formula in enumerate(sum_formulae):
-            sf = pyisocalc.complex_to_simple(sum_formula+adduct)
-            if sf == None: #negative atoms as a result of simplification
-                print 'negative adduct for {} : {}'.format(sum_formula,adduct)
-                continue
-            isotope_ms = pyisocalc.isodist(sf, plot=False, sigma=isocalc_sig, charges=charge,
-                                           resolution=isocalc_resolution, do_centroid=isocalc_do_centroid)
-            if not sum_formula in mz_list:
-                mz_list[sum_formula] = {}
-            mz_list[sum_formula][adduct] = isotope_ms.get_spectrum(source='centroids')
-        return mz_list
+    from pyMS.pyisocalc import pyisocalc
+    ### Generate a mz list of peak centroids for each sum formula with the given adduct
+    mz_list = {}
+    for n, sum_formula in enumerate(sum_formulae):
+        sf = pyisocalc.complex_to_simple(sum_formula+adduct)
+        if sf == None: #negative atoms as a result of simplification
+            print 'negative adduct for {} : {}'.format(sum_formula,adduct)
+            continue
+        isotope_ms = pyisocalc.isodist(sf, plot=False, sigma=isocalc_sig, charges=charge,
+                                       resolution=isocalc_resolution, do_centroid=isocalc_do_centroid)
+        if not sum_formula in mz_list:
+            mz_list[sum_formula] = {}
+        mz_list[sum_formula][adduct] = isotope_ms.get_spectrum(source='centroids')
+    return mz_list
 
 
 def generate_isotope_patterns(config):
     from pySpatialMetabolomics.parse_databases import parse_databases
-    from pyMS.pyisocalc import pyisocalc
+
     import pickle
     # Extract variables from config dict
     db_filename = config['file_inputs']['database_file']
@@ -302,7 +303,7 @@ def output_pass_results(config, measure_value_score, iso_correlation_score, iso_
 
 def load_data(config):
     # Parse dataset
-    from pyIMS.hdf5.inMemoryIMS import inMemoryIMS
+    from pyIMS.inMemoryIMS import inMemoryIMS
     IMS_dataset = inMemoryIMS(config['file_inputs']['data_file'])
     return IMS_dataset
 
