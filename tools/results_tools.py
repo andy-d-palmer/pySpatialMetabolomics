@@ -46,7 +46,14 @@ def condense_lipid(str_in):
     test_str='PC(o-18:1(9Z)/16:0)' #PC(o-34:1)
     print condense_lipid(test_str)
     """
-    l_class = str_in[0:str_in.index("(")]
+    try:
+        l_class = str_in[0:str_in.index("(")]
+    except ValueError as e:
+            if str(e) == "substring not found":
+                print 'not lipid? {}'.format(str_in)
+                return str_in
+            else:
+                raise
     chain_info = [c.strip('()') for c in str_in[str_in.index("("):].split('/')]
     n_carbon=0
     n_dbl=0
