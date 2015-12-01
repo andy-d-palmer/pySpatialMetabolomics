@@ -13,7 +13,7 @@ def calc_fdr_df(target_df,decoy_df,col='mult',ascending=False):
 
     #decoy_hits = np.cumsum(score_tf,dtype=float)
     #target_hits = np.cumsum(score_tf==False,dtype=float)
-    fdr_curve = decoy_hits/target_hits
+    #fdr_curve = decoy_hits/target_hits
     fdr_curve = np.asarray([d/t for d,t in zip(decoy_hits,target_hits)])
     fdr_curve[target_hits==0]=0
     return fdr_curve,target_hits,score_vect[col]
