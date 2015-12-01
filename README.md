@@ -9,7 +9,7 @@ This is a reference implementation of our pipeline for annotating high-resolutio
 ### How do I get set up? ###
 
 * Requires pyIMS and pyMS
-    * clone from https://github.com/alexandrovteam/pyMS, https://github.com/alexandrovteam/pyIMS
+    * clone from https://github.com/andy-d-palmer/pyMS, https://github.com/andy-d-palmer/pyIMS
     * add the local directory to the python path os.path.append(my/local//directory/python_code)
 * install pyimzml
     * pip install pyimzml
