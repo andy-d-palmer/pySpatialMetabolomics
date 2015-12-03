@@ -102,7 +102,7 @@ def plot_images(ion_datacube,iso_spect,iso_max,q_val=99,c_map='hot'):
     import matplotlib.pyplot as plt
     from pyIMS.image_measures import level_sets_measure, isotope_image_correlation, isotope_pattern_match
     measure_value_score = 1 - level_sets_measure.measure_of_chaos(
-                    ion_datacube.xic_to_image(0), 30, interp=False)[0]
+                    ion_datacube.xic_to_image(0), 30, interp="median")[0]
     # 3. Score correlation with monoiso
     if len(iso_spect[1]) > 1:
         iso_correlation_score = isotope_image_correlation.isotope_image_correlation(
@@ -110,6 +110,8 @@ def plot_images(ion_datacube,iso_spect,iso_max,q_val=99,c_map='hot'):
     else:  # only one isotope peak, so correlation doesn't make sense
         iso_correlation_score = 1
     iso_ratio_score = isotope_pattern_match.isotope_pattern_match(ion_datacube.xic,iso_spect[1])
+    msm_score = measure_value_score*iso_correlation_score*iso_ratio_score
+
     ax = [   plt.subplot2grid((2, 4), (0, 0)),
          plt.subplot2grid((2, 4), (0, 1)),
          plt.subplot2grid((2, 4), (0, 2)),
@@ -139,7 +141,7 @@ def plot_images(ion_datacube,iso_spect,iso_max,q_val=99,c_map='hot'):
     iso_spect[1] = iso_spect[1]/np.linalg.norm(iso_spect[1])
 
     markerline, stemlines, baseline = ax[4].stem(iso_spect[0][0:iso_max],iso_spect[1][0:iso_max],'g')
-    plt.title("{:3.4f} {:3.2f} {:3.2f}".format(measure_value_score,iso_correlation_score,iso_ratio_score))
+    plt.title("{:3.4f} {:3.2f} {:3.2f} {:3.3f}".format(measure_value_score,iso_correlation_score,iso_ratio_score,msm_score))
     plt.setp(stemlines, linewidth=2, color='g')     # set stems  colors
     plt.setp(markerline, 'markerfacecolor', 'g','markeredgecolor','g')    # make points 
 
