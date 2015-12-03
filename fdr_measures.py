@@ -114,7 +114,7 @@ class decoy_adducts():
         self.sf_l = np.unique(self.score_data_df["sf"])
         self.n_sf = len(self.sf_l)
 
-    def decoy_adducts_get_pass_list(self,fdr_target,n_reps,col='msm'):
+    def decoy_adducts_get_pass_list(self,fdr_target,n_reps,col='msm',return_decoy=False):
         # Get MSM threshold @ target fdr
         # Return molecules with higher MSM value
         msm_vals = self.get_msm_threshold(fdr_target,n_reps)
@@ -122,7 +122,14 @@ class decoy_adducts():
         for a in self.target_adducts:
             target_df = self.score_data_df.ix[self.score_data_df["adduct"]==a]
             pass_list[a] = target_df.ix[target_df[col]>msm_vals[a]]['sf'].values
-        return pass_list
+        if not return_decoy:
+            return pass_list
+        else:
+            pass_list_decoy={}
+            for a in self.target_adducts:
+                decoy_df = self.score_data_df.ix[~self.score_data_df["adduct"].isin(self.target_adducts)]
+                pass_list_decoy[a] = decoy_df.ix[decoy_df[col]>msm_vals[a]][['sf','adduct']].values
+            return pass_list,pass_list_decoy
 
     def get_msm_threshold(self, fdr_target, n_reps=10, col='msm'):
         # Repeatedly calcualte FDR curves
