@@ -97,16 +97,25 @@ def check_pass(pass_thresh,pass_val):
         return False
 
 
-def plot_images(ion_datacube,iso_spect,iso_max,ax=[],q_val=99):
+def plot_images(ion_datacube,iso_spect,iso_max,q_val=99,c_map='hot'):
+    import numpy as np
     import matplotlib.pyplot as plt
-    if ax==[]:
-        fig = plt.figure(figsize=(20,15),dpi=300)
-        ax = [   plt.subplot2grid((2, 4), (0, 0)),
-             plt.subplot2grid((2, 4), (0, 1)),
-             plt.subplot2grid((2, 4), (0, 2)),
-             plt.subplot2grid((2, 4), (0, 3)),
-             plt.subplot2grid((2, 4), (1, 0), colspan=4, rowspan=1)
-         ]
+    from pyIMS.image_measures import level_sets_measure, isotope_image_correlation, isotope_pattern_match
+    measure_value_score = 1 - level_sets_measure.measure_of_chaos(
+                    ion_datacube.xic_to_image(0), 30, interp=False)[0]
+    # 3. Score correlation with monoiso
+    if len(iso_spect[1]) > 1:
+        iso_correlation_score = isotope_image_correlation.isotope_image_correlation(
+            ion_datacube.xic, weights=iso_spect[1][1:])
+    else:  # only one isotope peak, so correlation doesn't make sense
+        iso_correlation_score = 1
+    iso_ratio_score = isotope_pattern_match.isotope_pattern_match(ion_datacube.xic,iso_spect[1])
+    ax = [   plt.subplot2grid((2, 4), (0, 0)),
+         plt.subplot2grid((2, 4), (0, 1)),
+         plt.subplot2grid((2, 4), (0, 2)),
+         plt.subplot2grid((2, 4), (0, 3)),
+         plt.subplot2grid((2, 4), (1, 0), colspan=4, rowspan=1)
+     ]
     for a in ax:
         a.cla()
     # plot images
@@ -121,45 +130,28 @@ def plot_images(ion_datacube,iso_spect,iso_max,ax=[],q_val=99):
             im_rep =  im>im_q       
             im[im_rep] = im_q 
 
-        ax[ii].imshow(im,cmap=c_map)
-        ax[ii].set_title('m/z: {:3.4f}'.format(mz_list[sum_formula][adduct][0][ii]))
+        ax[ii].imshow(im,cmap=c_map,interpolation='nearest')
+        ax[ii].set_title('m/z: {:3.4f}'.format(iso_spect[0][ii]))
     # plot spectrum
     notnull=ion_datacube.xic_to_image(0)>0
     data_spect = [np.sum(ion_datacube.xic_to_image(ii)) for ii in range(0,iso_max)]
     data_spect = data_spect / np.linalg.norm(data_spect)
-    iso_spect = iso_spect/np.linalg.norm(iso_spect)
+    iso_spect[1] = iso_spect[1]/np.linalg.norm(iso_spect[1])
 
-    markerline, stemlines, baseline = ax[4].stem( mz_list[sum_formula][adduct][0][0:iso_max],iso_spect,'g')
+    markerline, stemlines, baseline = ax[4].stem(iso_spect[0][0:iso_max],iso_spect[1][0:iso_max],'g')
+    plt.title("{:3.4f} {:3.2f} {:3.2f}".format(measure_value_score,iso_correlation_score,iso_ratio_score))
     plt.setp(stemlines, linewidth=2, color='g')     # set stems  colors
     plt.setp(markerline, 'markerfacecolor', 'g','markeredgecolor','g')    # make points 
 
-    markerline, stemlines, baseline = ax[4].stem( mz_list[sum_formula][adduct][0][0:iso_max],data_spect,'r')
+    markerline, stemlines, baseline = ax[4].stem(iso_spect[0][0:iso_max],data_spect,'r')
     plt.setp(stemlines, linewidth=2, color='r')     # set stems colors
     plt.setp(markerline, 'markerfacecolor', 'r','markeredgecolor','r')    # make points 
-    
-    #plot proxy artist
-    proxies=[]
-    h, = plt.plot(mz_list[sum_formula][adduct][0][0],[0],'-g')
-    proxies.append(h)
-    h, = plt.plot(mz_list[sum_formula][adduct][0][0],[0],'-r')
-    proxies.append(h)
-
-    
-    ax[4].legend(proxies,('predicted pattern','data pattern'), numpoints=1)
-    return fig,ax
-    plt.setp(markerline, 'markerfacecolor', 'g','markeredgecolor','g')    # make points
-
-    markerline, stemlines, baseline = ax[4].stem( mz_list[0:iso_max],data_spect,'r')
-    plt.setp(stemlines, linewidth=2, color='r')     # set stems colors
-    plt.setp(markerline, 'markerfacecolor', 'r','markeredgecolor','r')    # make points
 
     #plot proxy artist
     proxies=[]
-    h, = plt.plot(mz_list[0],[0],'-g')
+    h, = plt.plot(iso_spect[0][0],[0],'-g')
     proxies.append(h)
-    h, = plt.plot(mz_list[0],[0],'-r')
+    h, = plt.plot(iso_spect[0][0],[0],'-r')
     proxies.append(h)
-
-
     ax[4].legend(proxies,('predicted pattern','data pattern'), numpoints=1)
-    return fig,ax
+    return ax
