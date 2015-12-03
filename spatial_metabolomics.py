@@ -7,6 +7,9 @@ sys.path.append('/Users/palmer/Documents/python_codebase/')
 def get_variables(json_filename):
     import json
     config = json.loads(open(json_filename).read())
+    # maintain compatibility with previous versions
+    if 'clean_im' not in config['image_generation']:
+        config['image_generation']['clean_im']=True
     return config
 
 
@@ -92,6 +95,7 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
     ppm = config['image_generation']['ppm']  # parts per million -  a measure of how accuracte the mass spectrometer is
     nlevels = config['image_generation']['nlevels']  # parameter for measure of chaos
     q = config['image_generation']['q']
+    clean_im = config['image_generation']['clean_im']
     measure_value_score = {}
     iso_correlation_score = {}
     iso_ratio_score = {}
@@ -119,8 +123,8 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
                                                          ppm)  # for each spectrum, sum the intensity of all peaks within tol of mz_list
                 ion_datacube.xic = hot_spot_removal(ion_datacube.xic, q)
                 # 2. Spatial Chaos
-                measure_value_score[sum_formula][adduct] = 1 - level_sets_measure.measure_of_chaos(
-                    ion_datacube.xic_to_image(0), nlevels, interp=False)[0]
+                measure_value_score[sum_formula][adduct] = level_sets_measure.measure_of_chaos(
+                    ion_datacube.xic_to_image(0), nlevels, interp=False, clean_im=clean_im)[0]
                 if measure_value_score[sum_formula][adduct] == 1:
                     measure_value_score[sum_formula][adduct] = 0
                 # 3. Score correlation with monoiso
