@@ -10,7 +10,7 @@ def get_variables(json_filename):
     # maintain compatibility with previous versions
     if 'clean_im' not in config['image_generation']:
         config['image_generation']['clean_im']=True
-        config['image_generation']['interp']=None
+        config['image_generation']['interp']=''
     return config
 
 
@@ -367,6 +367,19 @@ def run_frequency_mass_search(config, IMS_dataset, sum_formulae, adducts, mz_lis
     return freq_value_score
 
 
+def bi_directional_fdr(mz_list,target_adducts):
+    # randomly subtracts 2*adduct_mass from some of the decoys as if they 'lost' the adduct
+    from pyMS.pyisocalc import pyisocalc
+    import numpy as np
+    target_adducts = set(target_adducts)
+    for sf in mz_list:
+        adduct_list = set(mz_list[sf].keys()) - target_adducts # can be different for each molecule (e.g if adduct loss would be imposisble)
+        for a in adduct_list:
+            if np.random.rand(1)>0.8:
+                mass_a = pyisocalc.PeriodicTable[a][2][np.argmax(pyisocalc.PeriodicTable[a][3])]
+                mz_list[sf][a][0] = [m-2*mass_a for m in mz_list[sf][a][0]]
+    return mz_list
+
 def fdr_selection(mz_list,pl_adducts, n_im):
     # produces a random subset of the adducts loaded in mz_list to actually calculate with
     pl_adducts = set(pl_adducts)
@@ -385,7 +398,11 @@ def run_pipeline(JSON_config_file):
     config = get_variables(JSON_config_file)
     sum_formulae, adducts, mz_list = generate_isotope_patterns(config)
     if 'fdr' in config:
-        mz_list = fdr_selection(mz_list,[str(a["adduct"]) for a in config['fdr']["pl_adducts"]], config['fdr']['n_im'])
+        target_adducts = [str(a["adduct"]) for a in config['fdr']["pl_adducts"]]
+        mz_list = fdr_selection(mz_list,target_adducts, config['fdr']['n_im'])
+        if 'bidirectional' in config['fdr']:
+            if config['fdr']['bidirectional']=="True":
+                mz_list = bi_directional_fdr(mz_list,target_adducts)
     IMS_dataset = load_data(config)
     measure_value_score, iso_correlation_score, iso_ratio_score = run_search(config, IMS_dataset, sum_formulae, adducts,mz_list)
     # pass_list = score_results(config,measure_value_score, iso_correlation_score, iso_ratio_score)
