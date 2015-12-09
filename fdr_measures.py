@@ -121,14 +121,14 @@ class decoy_adducts():
         pass_list={}
         for a in self.target_adducts:
             target_df = self.score_data_df.ix[self.score_data_df["adduct"]==a]
-            pass_list[a] = target_df.ix[target_df[col]>msm_vals[a]]['sf'].values
+            pass_list[a] = target_df.ix[target_df[col]>msm_vals[a]][['sf','msm']].values
         if not return_decoy:
             return pass_list
         else:
             pass_list_decoy={}
             for a in self.target_adducts:
                 decoy_df = self.score_data_df.ix[~self.score_data_df["adduct"].isin(self.target_adducts)]
-                pass_list_decoy[a] = decoy_df.ix[decoy_df[col]>msm_vals[a]][['sf','adduct']].values
+                pass_list_decoy[a] = decoy_df.ix[decoy_df[col]>msm_vals[a]][['sf','adduct','msm']].values
             return pass_list,pass_list_decoy
 
     def get_msm_threshold(self, fdr_target, n_reps=10, col='msm'):
@@ -152,8 +152,7 @@ class decoy_adducts():
     def get_fdr_curve(self,adduct,n_reps=10,col='msm'):
         # for a particular adduct, calcualte n_reps fdr curves
         target_df = self.score_data_df.ix[self.score_data_df["adduct"]==adduct]
-        data_reps = len(self.score_data_df)/len(self.sf_l) - len(self.target_adducts)
-
+        data_reps = len(self.score_data_df)/self.n_sf - len(self.target_adducts)
         col_vector_decoy = self.score_data_df.ix[self.score_data_df['adduct'].isin(self.decoy_adducts)][col].values
         col_vector_decoy = col_vector_decoy.reshape((self.n_sf,data_reps))
         _ = [np.random.shuffle(i) for i in col_vector_decoy] #shuffle the values in each row
