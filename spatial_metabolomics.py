@@ -10,7 +10,7 @@ def get_variables(json_filename):
     # maintain compatibility with previous versions
     if 'clean_im' not in config['image_generation']:
         config['image_generation']['clean_im']=True
-        config['image_generation']['interp']=None
+        config['image_generation']['interp']=''
     return config
 
 
