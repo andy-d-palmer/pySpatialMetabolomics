@@ -117,7 +117,7 @@ class decoy_adducts():
     def decoy_adducts_get_pass_list(self,fdr_target,n_reps,col='msm',return_decoy=False):
         # Get MSM threshold @ target fdr
         # Return molecules with higher MSM value
-        msm_vals = self.get_msm_threshold(fdr_target,n_reps)
+        msm_vals = self.get_msm_threshold_per_adduct(fdr_target,n_reps)
         pass_list={}
         for a in self.target_adducts:
             target_df = self.score_data_df.ix[self.score_data_df["adduct"]==a]
@@ -131,21 +131,28 @@ class decoy_adducts():
                 pass_list_decoy[a] = decoy_df.ix[decoy_df[col]>msm_vals[a]][['sf','adduct']].values
             return pass_list,pass_list_decoy
 
-    def get_msm_threshold(self, fdr_target, n_reps=10, col='msm'):
+    def get_msm_thresholds(self,adduct,fdr_target,n_reps=10,col='msm'):
+        """
+            Calculate the MSM crossing point at a given target fdr
+        """
+        fdr_curves,target_hits,score_vects =self.get_fdr_curve(adduct,n_reps,col)
+        msm_vals = []
+        for n in range(n_reps):
+            crossing_idx = find_crossing(fdr_curves[n],fdr_target)
+            if crossing_idx >-1:
+                msm_vals.append(score_vects[n].iloc[crossing_idx])
+            else:
+                msm_vals.append(0)
+        return msm_vals
+
+    def get_msm_threshold_per_adduct(self, fdr_target, n_reps=10, col='msm'):
         # Repeatedly calcualte FDR curves
         #   Find target crossing point -> find correspdoning msm score
         # return average score per adduct
         msm_vals = {}
         for a in self.target_adducts:
-            msm_vals[a]=[]
-            fdr_curves,target_hits,score_vects =self.get_fdr_curve(a,n_reps,col)
-            for n in range(n_reps):
-                crossing_idx = find_crossing(fdr_curves[n],fdr_target)
-                if crossing_idx >-1:
-                    msm_vals[a].append(score_vects[n].iloc[crossing_idx])
-
-        # calculate average
-        for a in self.target_adducts:
+            msm_vals[a]= self.get_msm_thresholds(a,fdr_target,n_reps=10,col='msm')
+            # calculate average
             msm_vals[a] = np.median(msm_vals[a])
         return msm_vals
 
