@@ -111,13 +111,16 @@ class decoy_adducts():
         self.score_data_df["msm"] = score_msm(self.score_data_df)
         self.score_data_df.sort("sf") #should this be here?
         # store some data info
-        self.sf_l = np.unique(self.score_data_df["sf"])
-        self.n_sf = len(self.sf_l)
+        self.sf_l = {}
+        self.n_sf = {}
+        for a in target_adducts:
+            self.sf_l[a] = np.unique(self.score_data_df.ix[self.score_data_df['adduct']==a]["sf"])
+            self.n_sf[a] = len(self.sf_l[a])
 
     def decoy_adducts_get_pass_list(self,fdr_target,n_reps,col='msm',return_decoy=False):
         # Get MSM threshold @ target fdr
         # Return molecules with higher MSM value
-        msm_vals = self.get_msm_threshold(fdr_target,n_reps)
+        msm_vals = self.get_msm_threshold_per_adduct(fdr_target,n_reps)
         pass_list={}
         for a in self.target_adducts:
             target_df = self.score_data_df.ix[self.score_data_df["adduct"]==a]
@@ -131,37 +134,45 @@ class decoy_adducts():
                 pass_list_decoy[a] = decoy_df.ix[decoy_df[col]>msm_vals[a]][['sf','adduct','msm']].values
             return pass_list,pass_list_decoy
 
-    def get_msm_threshold(self, fdr_target, n_reps=10, col='msm'):
+    def get_msm_thresholds(self,adduct,fdr_target,n_reps=10,col='msm'):
+        """
+            Calculate the MSM crossing point at a given target fdr
+        """
+        fdr_curves,target_hits,score_vects =self.get_fdr_curve(adduct,n_reps,col)
+        msm_vals = []
+        for n in range(n_reps):
+            crossing_idx = find_crossing(fdr_curves[n],fdr_target)
+            if crossing_idx >-1:
+                msm_vals.append(score_vects[n].iloc[crossing_idx])
+            else:
+                msm_vals.append(0)
+        return msm_vals
+
+    def get_msm_threshold_per_adduct(self, fdr_target, n_reps=10, col='msm'):
         # Repeatedly calcualte FDR curves
         #   Find target crossing point -> find correspdoning msm score
         # return average score per adduct
         msm_vals = {}
         for a in self.target_adducts:
-            msm_vals[a]=[]
-            fdr_curves,target_hits,score_vects =self.get_fdr_curve(a,n_reps,col)
-            for n in range(n_reps):
-                crossing_idx = find_crossing(fdr_curves[n],fdr_target)
-                if crossing_idx >-1:
-                    msm_vals[a].append(score_vects[n].iloc[crossing_idx])
-
-        # calculate average
-        for a in self.target_adducts:
+            msm_vals[a]= self.get_msm_thresholds(a,fdr_target,n_reps=10,col='msm')
+            # calculate average
             msm_vals[a] = np.median(msm_vals[a])
         return msm_vals
 
     def get_fdr_curve(self,adduct,n_reps=10,col='msm'):
         # for a particular adduct, calcualte n_reps fdr curves
         target_df = self.score_data_df.ix[self.score_data_df["adduct"]==adduct]
-        data_reps = len(self.score_data_df)/self.n_sf - len(self.target_adducts)
-        col_vector_decoy = self.score_data_df.ix[self.score_data_df['adduct'].isin(self.decoy_adducts)][col].values
-        col_vector_decoy = col_vector_decoy.reshape((self.n_sf,data_reps))
+        col_vector_decoy = self.score_data_df.ix[self.score_data_df['adduct'].isin(self.decoy_adducts) &
+                                    self.score_data_df['sf'].isin(self.sf_l[adduct])][col].values
+        data_reps = len(col_vector_decoy)/len(self.sf_l[adduct])
+        col_vector_decoy = col_vector_decoy.reshape((self.n_sf[adduct],data_reps))
         _ = [np.random.shuffle(i) for i in col_vector_decoy] #shuffle the values in each row
         fdr_curves = []
         target_hits= []
         score_vects= []
         for n in range(n_reps):
             col_vector=col_vector_decoy[:,n]
-            decoy_df = pd.DataFrame({"sf":self.sf_l,col:col_vector})
+            decoy_df = pd.DataFrame({"sf":self.sf_l[adduct],col:col_vector})
             fdr_curve,target_hit,score_vect = calc_fdr_df(target_df,decoy_df,col=col,ascending=False)
             fdr_curves.append(fdr_curve)
             target_hits.append(target_hit)
