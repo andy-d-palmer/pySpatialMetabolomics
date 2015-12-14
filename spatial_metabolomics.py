@@ -4,14 +4,26 @@ import os
 sys.path.append('/Users/palmer/Documents/python_codebase/')
 
 
+def d_update(d, u):
+    import collections
+    #http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth
+    for k, v in u.iteritems():
+        if isinstance(v, collections.Mapping):
+            r = d_update(d.get(k, {}), v)
+            d[k] = r
+        else:
+            d[k] = u[k]
+    return d
+
+
 def get_variables(json_filename):
     import json
     config = json.loads(open(json_filename).read())
     # maintain compatibility with previous versions
-    if 'clean_im' not in config['image_generation']:
-        config['image_generation']['clean_im']=True
-        config['image_generation']['interp']=''
-    return config
+    # defaults are be how everything *should* be -> update makes sure that whatever is loaded conforms to this
+    compatability_defaults = {'image_generation':{'smooth': True, 'smooth_params':()} }
+    config = d_update(compatability_defaults,config)
+    return compatability_defaults
 
 
 ### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
@@ -87,6 +99,26 @@ def hot_spot_removal(xics, q):
         xic[xic > xic_q] = xic_q
     return xics
 
+def apply_image_processing(config, ion_datacube):
+    """
+    Function to apply pre-defined image processing methods to ion_datacube
+    #todo: expose parameters in config
+    :param ion_datacube:
+    :return:
+    """
+    q = config['image_generation']['q']
+    if q > 0:
+        ion_datacube.xic = hot_spot_removal(ion_datacube.xic, q)
+    smooth_method = config['image_generation']['smooth']
+    smooth_params = config['image_generation']['smooth_params']
+    if smooth_method != '':
+        raise NotImplementedError
+        from pyIMS import smoothing
+        for ii in range(n_im):
+            im = ion_datacube.xic_to_image(ii)
+            im = smoothing.smooth(smooth_method,*smooth_params)
+        #todo put xic back into vecotr
+
 
 def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
     from pyIMS.image_measures import level_sets_measure, isotope_image_correlation, isotope_pattern_match
@@ -95,9 +127,8 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
     # Get sum formula and predicted m/z peaks for molecules in database
     ppm = config['image_generation']['ppm']  # parts per million -  a measure of how accuracte the mass spectrometer is
     nlevels = config['image_generation']['nlevels']  # parameter for measure of chaos
-    q = config['image_generation']['q']
-    clean_im = config['image_generation']['clean_im']
-    interp = config['image_generation']['interp']
+    do_preprocessing = config['image_generation']['do_preprocessing']
+    interp = config['image_generation']['smooth']
     measure_value_score = {}
     iso_correlation_score = {}
     iso_ratio_score = {}
@@ -123,10 +154,11 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
                 # 1. Generate ion images
                 ion_datacube = IMS_dataset.get_ion_image(mz_list[sum_formula][adduct][0],
                                                          ppm)  # for each spectrum, sum the intensity of all peaks within tol of mz_list
-                ion_datacube.xic = hot_spot_removal(ion_datacube.xic, q)
+                if do_preprocessing:
+                    apply_image_processing(config,ion_datacube) #currently just supports hot-spot removal
                 # 2. Spatial Chaos
                 measure_value_score[sum_formula][adduct] = level_sets_measure.measure_of_chaos(
-                    ion_datacube.xic_to_image(0), nlevels, interp=interp, clean_im=clean_im)[0]
+                    ion_datacube.xic_to_image(0), nlevels, interp=interp, clean_im=False)[0]
                 if measure_value_score[sum_formula][adduct] == 1:
                     measure_value_score[sum_formula][adduct] = 0
                 # 3. Score correlation with monoiso
@@ -139,7 +171,8 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
                 iso_ratio_score[sum_formula][adduct] = isotope_pattern_match.isotope_pattern_match(ion_datacube.xic,
                                                                                                    mz_list[sum_formula][
                                                                                                        adduct][1])
-            except KeyError:
+            except KeyError as e:
+                print str(e)
                 print "bad key in: \"{}\" \"{}\" ".format(sum_formula, adduct)
         output_results(config, measure_value_score, iso_correlation_score, iso_ratio_score, sum_formulae, [adduct], mz_list)
     return measure_value_score, iso_correlation_score, iso_ratio_score
