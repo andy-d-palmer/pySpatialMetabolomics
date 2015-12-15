@@ -21,7 +21,7 @@ def get_variables(json_filename):
     config = json.loads(open(json_filename).read())
     # maintain compatibility with previous versions
     # defaults are be how everything *should* be -> update makes sure that whatever is loaded conforms to this
-    compatability_defaults = {'image_generation':{'smooth': True, 'smooth_params':()} }
+    compatability_defaults = {'image_generation':{'smooth': True, 'smooth_params':{} } }
     config = d_update(compatability_defaults,config)
     return compatability_defaults
 
@@ -94,6 +94,7 @@ def generate_isotope_patterns(config):
 
 
 def hot_spot_removal(xics, q):
+    print 'moved to pyIMS.smoothing - should be called'
     for xic in xics:
         xic_q = np.percentile(xic, q)
         xic[xic > xic_q] = xic_q
@@ -104,21 +105,28 @@ def apply_image_processing(config, ion_datacube):
     Function to apply pre-defined image processing methods to ion_datacube
     #todo: expose parameters in config
     :param ion_datacube:
+        object from pyIMS.ion_datacube already containing images
     :return:
+        ion_datacube is updated in place.
+        None returned
     """
+    from pyIMS import smoothing
+    #todo hot_spot_removal shouldn't be separately coded - should be within smooth_methods of config and iterated over
+    # every method in smoothing should accept (im,**args)
     q = config['image_generation']['q']
     if q > 0:
-        ion_datacube.xic = hot_spot_removal(ion_datacube.xic, q)
+        for xic in ion_datacube.xic:
+            smoothing.hot_spot_removal(xic, q) #updated in place
     smooth_method = config['image_generation']['smooth']
     smooth_params = config['image_generation']['smooth_params']
     if smooth_method != '':
-        raise NotImplementedError
-        from pyIMS import smoothing
-        for ii in range(n_im):
+        for ii in range(ion_datacube.n_im):
             im = ion_datacube.xic_to_image(ii)
-            im = smoothing.smooth(smooth_method,*smooth_params)
-        #todo put xic back into vecotr
-
+            #todo: for method in smoothing_methods:
+            methodToCall = getattr(smoothing,smooth_method)
+            im_s = methodToCall(im,**smooth_params)
+            ion_datacube.xic[ii] = ion_datacube.image_to_xic(im_s)
+    return None
 
 def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
     from pyIMS.image_measures import level_sets_measure, isotope_image_correlation, isotope_pattern_match
@@ -158,7 +166,7 @@ def run_search(config, IMS_dataset, sum_formulae, adducts, mz_list):
                     apply_image_processing(config,ion_datacube) #currently just supports hot-spot removal
                 # 2. Spatial Chaos
                 measure_value_score[sum_formula][adduct] = level_sets_measure.measure_of_chaos(
-                    ion_datacube.xic_to_image(0), nlevels, interp=interp, clean_im=False)[0]
+                    ion_datacube.xic_to_image(0), nlevels, interp=None, clean_im=False)[0]
                 if measure_value_score[sum_formula][adduct] == 1:
                     measure_value_score[sum_formula][adduct] = 0
                 # 3. Score correlation with monoiso
