@@ -28,24 +28,45 @@ def get_variables(json_filename):
 
 ### We simulate a mass spectrum for each sum formula/adduct combination. This generates a set of isotope patterns (see http://www.mi.fu-berlin.de/wiki/pub/ABI/QuantProtP4/isotope-distribution.pdf) which can provide additional informaiton on the molecule detected. This gives us a list of m/z centres for the molecule
 def calculate_isotope_patterns(sum_formulae, adduct='', isocalc_sig=0.01, isocalc_resolution=200000.,
-                                   isocalc_do_centroid=True, charge='1'):
+                                   isocalc_do_centroid=True, charge=1,verbose=True):
     from pyMS.pyisocalc import pyisocalc
     ### Generate a mz list of peak centroids for each sum formula with the given adduct
     mz_list = {}
     for n, sum_formula in enumerate(sum_formulae):
-        sf = pyisocalc.complex_to_simple(sum_formula+adduct)
+        try:
+            if verbose:
+                print sum_formula, adduct
+            sf = pyisocalc.complex_to_simple(sum_formula+adduct)
+        except KeyError as e:
+            if str(e).startswith("KeyError: "):
+                print str(e)
+                continue
+        except ValueError as e:
+            if str(e).startswith("Element not recognised"):
+                print str(e)
+                continue
+            else:
+                print sum_formula, adduct
+                raise
         if sf == None: #negative atoms as a result of simplification
             print 'negative adduct for {} : {}'.format(sum_formula,adduct)
             continue
-        isotope_ms = pyisocalc.isodist(sf, plot=False, sigma=isocalc_sig, charges=charge,
+        try:
+            isotope_ms = pyisocalc.isodist(sf, plot=False, sigma=isocalc_sig, charges=charge,
                                        resolution=isocalc_resolution, do_centroid=isocalc_do_centroid)
+        except KeyError as e:
+            if str(e).startswith("KeyError: "):
+                print str(e)
+                continue
+
         if not sum_formula in mz_list:
             mz_list[sum_formula] = {}
         mz_list[sum_formula][adduct] = isotope_ms.get_spectrum(source='centroids')
+
     return mz_list
 
 
-def generate_isotope_patterns(config):
+def generate_isotope_patterns(config,verbose=True):
     from pySpatialMetabolomics.parse_databases import parse_databases
 
     import pickle
@@ -64,7 +85,8 @@ def generate_isotope_patterns(config):
     # Read in molecules
     sum_formulae = parse_databases.read_generic_csv(db_filename)
     if '' in sum_formulae:
-        print 'empty sf removed from list'
+        if verbose:
+            print 'empty sf removed from list'
         del sum_formulae['']
     # Check if already genrated and load if possible, otherwise calculate fresh   
     db_name = os.path.splitext(os.path.basename(db_filename))[0]
@@ -72,10 +94,12 @@ def generate_isotope_patterns(config):
     for adduct in adducts:
         load_file = '{}/{}_{}_{}_{}.dbasedump'.format(db_dump_folder, db_name, adduct, isocalc_sig, isocalc_resolution)
         if os.path.isfile(load_file):
-            print "{} -> loading".format(load_file)
+            if verbose:
+                print  "{} -> loading".format(load_file)
             mz_list_tmp = pickle.load(open(load_file, 'r'))
         else:
-            print "{} -> generating".format(load_file)
+            if verbose:
+                print "{} -> generating".format(load_file)
             mz_list_tmp = calculate_isotope_patterns(sum_formulae, adduct=adduct, isocalc_sig=isocalc_sig,
                                                      isocalc_resolution=isocalc_resolution, charge=charge)
             if db_dump_folder != "":
@@ -89,7 +113,8 @@ def generate_isotope_patterns(config):
             ## this limit of 4 is hardcoded to reduce the number of calculations
             n = np.min([4,len(mz_list_tmp[sum_formula][adduct][0])])
             mz_list[sum_formula][adduct] = [mz_list_tmp[sum_formula][adduct][0][0:n],mz_list_tmp[sum_formula][adduct][1][0:n]]
-    print 'all isotope patterns generated and loaded'
+    if verbose:
+        print  'all isotope patterns generated and loaded'
     return sum_formulae, adducts, mz_list
 
 

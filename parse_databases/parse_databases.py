@@ -66,8 +66,13 @@ def read_hmdb_compounds(filename):
                     sum_formulae[sf]['db_id'] = [db_id]
                     sum_formulae[sf]['mw'] = mw
     return sum_formulae
-def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
+
+def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1,verbose=False):
     import csv
+    import re
+    # some things lead to sf that cannot be parsed (mostly optional groups)
+    # currently I just exclude these - a better database would provide combinations
+    bad_groups = re.compile("(x)|(\,)|(\.n)|(\)n)|(R$)|(?:(R)[A-Z0-9])|(?:(X)[A-Z0-9])|(X$)")
     sum_formulae = {}
     with open(filename,'rU') as filein_db:
         data_in = csv.reader(filein_db,delimiter=',')
@@ -80,6 +85,7 @@ def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
                 continue
             db_id = line[idcol]
             sf = line[sfcol]
+            sf=sf.replace(" ","")
             name = line[namecol]
             mw = line[mwcol]
             if mw=='':
@@ -91,8 +97,9 @@ def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
                 mw=''
                 db_id=''
                 continue
-            if sf =='':
-                print 'bailing on empty sf: {} {} {}'.format(db_id,name,mw)
+            if any((sf =='',bad_groups.findall(sf)!=[])):
+                if verbose:
+                    print 'bad sf?: ID:{} name:{} sf:{}'.format(db_id,name,sf)
                 continue
             if not sf in sum_formulae:
                 sum_formulae[sf] = {'name':[], 'db_id':[], 'mw':[]}
@@ -100,6 +107,7 @@ def read_generic_csv(filename,idcol=0,namecol=1,mwcol=2,sfcol=3,header=1):
             sum_formulae[sf]['db_id'].append(db_id)
             sum_formulae[sf]['mw'] = mw
     return sum_formulae
+
 def read_helfrich_cyano_compounds(filename):
     import csv
     sum_formulae = {}

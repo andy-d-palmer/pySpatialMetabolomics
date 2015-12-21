@@ -141,7 +141,7 @@ def plot_images(ion_datacube,iso_spect,iso_max,q_val=99,c_map='hot'):
     iso_spect[1] = iso_spect[1]/np.linalg.norm(iso_spect[1])
 
     markerline, stemlines, baseline = ax[4].stem(iso_spect[0][0:iso_max],iso_spect[1][0:iso_max],'g')
-    plt.title("{:3.4f} {:3.2f} {:3.2f} {:3.3f}".format(measure_value_score,iso_correlation_score,iso_ratio_score,msm_score))
+    plt.title("moc: {:3.4f} spat: {:3.2f} spec: {:3.2f} msm: {:3.3f}".format(measure_value_score,iso_correlation_score,iso_ratio_score,msm_score))
     plt.setp(stemlines, linewidth=2, color='g')     # set stems  colors
     plt.setp(markerline, 'markerfacecolor', 'g','markeredgecolor','g')    # make points 
 
